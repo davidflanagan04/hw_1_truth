@@ -33,7 +33,26 @@ def index(request):
     context = {}
     return render(request, 'app/index.html', context)
 
+def time_view(request):
+    """Return the current Central time as plain text, formatted HH:MM."""
+    now = datetime.now(CDT)
+    return HttpResponse(now.strftime("%H:%M"), content_type="text/plain")
 
+def sum_view(request):
+    """Return {"sum": n1 + n2} for GET parameters n1 and n2."""
+    def to_number(s):
+        try:
+            return int(s)
+        except ValueError:
+            return float(s)
+
+    try:
+        n1 = to_number(request.GET["n1"])
+        n2 = to_number(request.GET["n2"])
+    except (KeyError, ValueError):
+        return HttpResponseBadRequest("n1 and n2 must be numbers")
+
+    return JsonResponse({"sum": n1 + n2})
 
 # ---------------------------------------------------------------------------
 # HW4  — user creation
