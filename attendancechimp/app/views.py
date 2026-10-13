@@ -39,7 +39,7 @@ def time_view(request):
     return HttpResponse(now.strftime("%H:%M"), content_type="text/plain")
 
 def sum_view(request):
-    """Return {"sum": n1 + n2} for GET parameters n1 and n2."""
+    """Return <p>{"sum": n1 + n2}</p> for GET parameters n1 and n2."""
     def to_number(s):
         try:
             return int(s)
@@ -52,7 +52,8 @@ def sum_view(request):
     except (KeyError, ValueError):
         return HttpResponseBadRequest("n1 and n2 must be numbers")
 
-    return JsonResponse({"sum": n1 + n2})
+    body = json.dumps({"sum": n1 + n2})
+    return HttpResponse(f"<p>{body}</p>", content_type="text/html")
 
 # ---------------------------------------------------------------------------
 # HW4  — user creation
