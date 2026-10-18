@@ -1,0 +1,19 @@
+Comparison of my models.py with the LLM-generated robot-models.py (Claude)
+
+Both models implement the same six tables with the same relationships. This 
+includes two one-to-one profile tables, Course, Enrollment,
+Lecture, and QRCodeUpload with a nullable lecture. The models differ primarily 
+in scope, since mine is a bit simpler. For example, meeting_schedule is a 
+single text field in my model, QRCodeUpload stores the decoded qr_text, 
+and there are no extra dependencies, thus making it easier to implement and 
+migrate. The LLM version is a bit more complicated. It includes a structured 
+schedule (meeting_days, start_time, end_time), an enrolled_on
+date, default orderings, and a unique (course, date) constraint on Lecture.
+The comma-separated meeting_days string is difficult to query and validate, 
+and the LLM's ImageField upload drops qr_text, which the decode-and-match
+workflow needs. It also uses hasattr() for role checks as well as using
+unique_together, while mine uses explicit queries that handle anonymous users
+and UniqueConstraint. Mine is also more thoroughly documented, with
+docstrings explaining why profiles are separate. Overall I find mine simpler
+and easier to comprehend / use, while the LLM's ideas (structured schedule,
+per-lecture uniqueness) are worth considering as later improvements.
