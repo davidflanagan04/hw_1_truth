@@ -1,5 +1,8 @@
-auth_group                  auth_user_user_permissions
-auth_group_permissions      django_admin_log          
-auth_permission             django_content_type       
-auth_user                   django_migrations         
-auth_user_groups            django_session            
+app_course                  auth_permission           
+app_enrollment              auth_user                 
+app_instructorprofile       auth_user_groups          
+app_lecture                 auth_user_user_permissions
+app_qrcodeupload            django_admin_log          
+app_studentprofile          django_content_type       
+auth_group                  django_migrations         
+auth_group_permissions      django_session            
