@@ -109,7 +109,6 @@ def createUser(request):
 # ---------------------------------------------------------------------------
 
 @require_GET
-@login_required
 def new_course_form(request):
     """Render the course-creation form for a logged-in user."""
     return render(request, 'app/new_course.html')
@@ -209,7 +208,6 @@ def dumpUploads(request):
     return JsonResponse(data, safe=False)
 
 @require_GET
-@login_required
 def new_lecture_form(request):
     """Render the lecture-creation form, listing the user's courses if an instructor."""
     courses = Course.objects.none()
@@ -218,7 +216,6 @@ def new_lecture_form(request):
     return render(request, 'app/new_lecture.html', {"courses": courses})
 
 @require_GET
-@login_required
 def new_qr_upload_form(request):
     """Render the QR-code upload form for a logged-in user."""
     return render(request, 'app/new_qr_upload.html')
