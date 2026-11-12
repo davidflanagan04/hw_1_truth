@@ -54,6 +54,7 @@ import uuid
 
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)  # allows logger.warning(), logger.info(), etc.
 
@@ -97,12 +98,26 @@ class Course(models.Model):
     instructor = models.ForeignKey(InstructorProfile, on_delete=models.CASCADE,
                                    related_name="courses")
     meeting_schedule = models.CharField(max_length=200)
+    course = models.CharField(max_length=20, unique=True, null=True, blank=True)  # e.g. DATA13600
+    meets_mon = models.BooleanField(default=False)
+    meets_tue = models.BooleanField(default=False)
+    meets_wed = models.BooleanField(default=False)
+    meets_thu = models.BooleanField(default=False)
+    meets_fri = models.BooleanField(default=False)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
     students = models.ManyToManyField(StudentProfile, through="Enrollment",
                                       related_name="courses")
 
     def __str__(self):
         """Return the course name."""
         return self.name
+
+    def meets_on_day(self, weekday):
+        """Return True if the course meets on ``weekday`` (0=Mon ... 6=Sun)."""
+        flags = [self.meets_mon, self.meets_tue, self.meets_wed,
+                 self.meets_thu, self.meets_fri]
+        return 0 <= weekday < len(flags) and flags[weekday]
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +206,23 @@ def is_student(user):
 
 
 def getUploadsForCourse(course):
-    """Return QRCodeUploads for ``course``'s lectures, newest first."""
-    return (QRCodeUpload.objects.filter(lecture__course=course)
-            .order_by("-uploaded_at", "-id"))
+    """Return the valid QRCodeUploads for the course number ``course``.
+
+    An upload is valid if it was made (in local time) on a day the course
+    meets and between its start_time and end_time.  Returns [] if no course
+    has that number.
+    """
+    course_obj = Course.objects.filter(course=course).first()
+    if course_obj is None or course_obj.start_time is None or course_obj.end_time is None:
+        return []
+
+    uploads = (QRCodeUpload.objects.filter(lecture__course=course_obj)
+               .order_by("uploaded_at", "id"))
+    valid = []
+    for upload in uploads:
+        local = timezone.localtime(upload.uploaded_at)
+        if not course_obj.meets_on_day(local.weekday()):
+            continue
+        if course_obj.start_time <= local.time() <= course_obj.end_time:
+            valid.append(upload)
+    return valid

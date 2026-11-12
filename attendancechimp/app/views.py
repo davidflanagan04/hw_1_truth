@@ -228,3 +228,18 @@ def new_qr_upload_form(request):
 
 
 
+@require_GET
+def getUploads(request):
+    """Return valid uploads for ?course=<number> as [{"username", "upload_time"}] (401 if not an instructor)."""
+    if not is_instructor(request.user):
+        return HttpResponse("Instructor login required", status=401,
+                            content_type="text/plain")
+
+    course = request.GET.get("course", "").strip()
+    if not course:
+        return JsonResponse({"error": "Missing course parameter"}, status=400)
+
+    data = [{"username": u.student.user.username,
+             "upload_time": u.uploaded_at.astimezone(CDT).strftime("%Y-%m-%d %H:%M:%S")}
+            for u in getUploadsForCourse(course)]
+    return JsonResponse(data, safe=False)
