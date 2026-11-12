@@ -142,9 +142,14 @@ def createCourse(request):
     if end <= start:
         return HttpResponseBadRequest("end-time must be after start-time")
 
+    if Course.objects.filter(course=name).exists():
+        return HttpResponseBadRequest("A course with that number already exists")
+
     meeting_schedule = f"{','.join(days)} {start_raw}-{end_raw}"
+    day_flags = {f"meets_{field[4:]}": label in days for field, label in COURSE_DAYS}
     course = Course.objects.create(
-        name=name, meeting_schedule=meeting_schedule,
+        name=name, course=name, meeting_schedule=meeting_schedule,
+        start_time=start.time(), end_time=end.time(), **day_flags,
         instructor=request.user.instructor_profile)
     return HttpResponse(f"Course created: {course.id}", content_type="text/plain")
 
