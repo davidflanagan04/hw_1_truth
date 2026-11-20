@@ -53,6 +53,8 @@ import logging
 import uuid
 
 from django.db import models
+from PIL import Image
+from pyzbar.pyzbar import decode as zbar_decode
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -226,3 +228,18 @@ def getUploadsForCourse(course):
         if course_obj.start_time <= local.time() <= course_obj.end_time:
             valid.append(upload)
     return valid
+
+
+def decodeQR(image):
+    """Return the text of the QR code in ``image`` as a string, or None.
+
+    ``image`` is an image file (an uploaded file or one opened with 'rb').
+    Returns None if no QR code is readable or the file is not an image.
+    """
+    try:
+        codes = zbar_decode(Image.open(image))
+        if not codes:
+            return None
+        return codes[0].data.decode("utf-8")
+    except Exception:
+        return None

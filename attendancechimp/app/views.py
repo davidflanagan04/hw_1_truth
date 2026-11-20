@@ -19,10 +19,12 @@ from datetime import datetime
 import zoneinfo
 import json
 import io
+import secrets
+import string
 
 from .models import (InstructorProfile, StudentProfile, Course, Enrollment,
                     Lecture, QRCodeUpload, is_instructor, is_student,
-                      getUploadsForCourse)
+                      getUploadsForCourse, decodeQR)
 
 CDT = zoneinfo.ZoneInfo("America/Chicago")
 
@@ -156,7 +158,11 @@ def createCourse(request):
 @csrf_exempt
 @require_POST
 def createLecture(request):
-    """Create a Lecture dated today for the named course (401 if not an instructor)."""
+    """Create a Lecture dated today for the named course (401 if not an instructor).
+
+    The QR identifier is the POSTed ``qrdata`` if given, else 16 random
+    letters/digits.
+    """
     if not is_instructor(request.user):
         return HttpResponse("Instructor login required", status=401,
                             content_type="text/plain")
@@ -171,13 +177,27 @@ def createLecture(request):
     if course.instructor.user_id != request.user.id:
         return HttpResponseForbidden("You do not teach that course")
 
-    lecture = Lecture.objects.create(course=course, date=datetime.now(CDT).date())
+    qr_identifier = request.POST.get("qrdata")
+    if qr_identifier is None or qr_identifier == "":
+        alphabet = string.ascii_letters + string.digits
+        qr_identifier = "".join(secrets.choice(alphabet) for _ in range(16))
+    elif len(qr_identifier) > Lecture._meta.get_field("qr_identifier").max_length:
+        return HttpResponseBadRequest("qrdata is too long")
+    if Lecture.objects.filter(qr_identifier=qr_identifier).exists():
+        return HttpResponseBadRequest("A lecture with that qrdata already exists")
+
+    lecture = Lecture.objects.create(course=course, date=datetime.now(CDT).date(),
+                                     qr_identifier=qr_identifier)
     return HttpResponse(f"Lecture created: {lecture.id}", content_type="text/plain")
 
 @csrf_exempt
 @require_POST
 def createQRCodeUpload(request):
-    """Store an uploaded QR-code image for the logged-in student (401 if not a student)."""
+    """Decode and store an uploaded QR-code image for the logged-in student.
+
+    401 if not a student; 400 if the QR code is unreadable or matches no
+    lecture (the upload is still stored, with no lecture link).
+    """
     if not is_student(request.user):
         return HttpResponse("Student login required", status=401,
                             content_type="text/plain")
@@ -186,18 +206,22 @@ def createQRCodeUpload(request):
     if image is None:
         return HttpResponseBadRequest("imageUpload file is required")
 
-    try:
-        Image.open(image).verify()
-    except Exception:
-        return HttpResponseBadRequest("imageUpload must be a valid image")
+    qr_text = decodeQR(image)
     image.seek(0)
+    lecture = None
+    if qr_text is not None:
+        lecture = Lecture.objects.filter(qr_identifier=qr_text).first()
 
-    # Decoding the QR text and matching it to a lecture is not done yet, so
-    # qr_text stays empty and lecture stays null.
-    upload = QRCodeUpload(student=request.user.student_profile, qr_text="")
+    # Always store the upload (for auditing), even when it is rejected below.
+    upload = QRCodeUpload(student=request.user.student_profile,
+                          lecture=lecture, qr_text=qr_text or "")
     upload.image.save(image.name, image, save=False)
     upload.save()
-    return HttpResponse(f"Upload created: {upload.id}", content_type="text/plain")
+
+    if lecture is None:
+        return JsonResponse({"error": "Invalid QR code"}, status=400)
+    return JsonResponse({"status": "ok", "upload_id": upload.id,
+                         "lecture_id": lecture.id}, status=200)
 
 @require_GET
 def dumpUploads(request):
